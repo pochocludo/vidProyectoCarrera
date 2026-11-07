@@ -17,19 +17,21 @@ def get_data_augmentation():
     """
     Aumento de datos aplicado EXCLUSIVAMENTE sobre la partición de entrenamiento.
     Cumple con las especificaciones de la Tabla 3.8 del documento de tesis.
+    Preserva estrictamente los descriptores morfométricos foliares (dientes, senos, nervaduras).
     """
     return keras.Sequential([
-        layers.RandomRotation(factor=0.1, fill_mode="reflect", name="rotacion_aleatoria"),
+        layers.RandomRotation(factor=0.15, fill_mode="reflect", name="rotacion_aleatoria"),
         layers.RandomFlip(mode="horizontal_and_vertical", name="reflejo_aleatorio"),
-        layers.RandomZoom(height_factor=0.1, width_factor=0.1, fill_mode="reflect", name="zoom_aleatorio"),
-        layers.RandomBrightness(factor=0.1, name="brillo_aleatorio"),
-        layers.RandomContrast(factor=0.1, name="contraste_aleatorio"),
+        layers.RandomZoom(height_factor=0.15, width_factor=0.15, fill_mode="reflect", name="zoom_aleatorio"),
+        layers.RandomTranslation(height_factor=0.1, width_factor=0.1, fill_mode="reflect", name="traslacion_aleatoria"),
+        layers.RandomBrightness(factor=0.15, name="brillo_aleatorio"),
+        layers.RandomContrast(factor=0.15, name="contraste_aleatorio"),
     ], name="data_augmentation")
 
-def compute_weights(train_dir, class_names):
+def compute_weights(train_dir, class_names, smooth=True):
     """
     Calcula pesos inversos por clase para mitigar el desbalance muestral (Sección 2.3.5 de la tesis).
-    w_k = N / (K * N_k)
+    Aplica suavizado de raíz cuadrada para evitar sobrepenalización en cultivares botánicamente próximos.
     """
     y_train = []
     for idx, cname in enumerate(class_names):
@@ -40,6 +42,9 @@ def compute_weights(train_dir, class_names):
     y_train = np.array(y_train)
     classes = np.unique(y_train)
     weights = compute_class_weight(class_weight="balanced", classes=classes, y=y_train)
+    if smooth:
+        weights = np.sqrt(weights)
+        weights = weights / np.mean(weights)
     class_weight_dict = {cls_idx: float(w) for cls_idx, w in zip(classes, weights)}
     return class_weight_dict
 
@@ -67,6 +72,11 @@ def get_datasets(dataset_path=None, batch_size=BATCH_SIZE, img_size=IMG_SIZE, au
     """
     Carga y prepara las tres particiones fijas (train, val, test) del dataset GLVD.
     Aplica Data Augmentation únicamente en el conjunto de entrenamiento.
+    
+    NOTA v4 (2026-10-27): Se removió Mixup debido a que en clasificación botánica fina
+    (ampelografía), la mezcla lineal de hojas destruye descriptores clave (dientes,
+    senos peciolares y nervaduras), colapsando el rendimiento a 30%. Se integró
+    .shuffle() posterior al .cache() para garantizar barajado real entre épocas.
     """
     if dataset_path is None:
         dataset_path = DATASET_DIR
@@ -86,6 +96,8 @@ def get_datasets(dataset_path=None, batch_size=BATCH_SIZE, img_size=IMG_SIZE, au
     # Data Augmentation en entrenamiento
     if augment_train:
         data_aug = get_data_augmentation()
+        train_ds = train_ds.cache()
+        train_ds = train_ds.shuffle(buffer_size=1500, seed=42, reshuffle_each_iteration=True)
         train_ds = train_ds.map(lambda x, y: (data_aug(x, training=True), y),
                                 num_parallel_calls=tf.data.AUTOTUNE)
         

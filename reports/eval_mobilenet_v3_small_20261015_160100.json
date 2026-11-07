@@ -1,0 +1,126 @@
+{
+    "architecture": "mobilenet_v3_small",
+    "seed": 42,
+    "parameters": {
+        "total_params": 1125632,
+        "trainable_params": 184592,
+        "non_trainable_params": 941040,
+        "size_mb_fp32": 4.2939453125,
+        "size_mb_int8": 1.073486328125
+    },
+    "top1_accuracy": 0.6125,
+    "macro_f1": 0.5721543162719633,
+    "h1a_satisfied": false,
+    "classification_report": {
+        "Ak": {
+            "precision": 0.8,
+            "recall": 0.8,
+            "f1-score": 0.8,
+            "support": 5.0
+        },
+        "Ala_Idris": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 5.0
+        },
+        "Auxerrois": {
+            "precision": 0.4166666666666667,
+            "recall": 1.0,
+            "f1-score": 0.5882352941176471,
+            "support": 5.0
+        },
+        "Buzgulu": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 5.0
+        },
+        "Cabernet Franc": {
+            "precision": 0.6666666666666666,
+            "recall": 0.4,
+            "f1-score": 0.5,
+            "support": 5.0
+        },
+        "Cabernet Sauvignon": {
+            "precision": 0.7142857142857143,
+            "recall": 1.0,
+            "f1-score": 0.8333333333333334,
+            "support": 5.0
+        },
+        "Chardonnay": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 5.0
+        },
+        "Dimnit": {
+            "precision": 0.6666666666666666,
+            "recall": 0.4,
+            "f1-score": 0.5,
+            "support": 5.0
+        },
+        "Merlot": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 5.0
+        },
+        "Muller Thurgau": {
+            "precision": 0.4444444444444444,
+            "recall": 0.8,
+            "f1-score": 0.5714285714285714,
+            "support": 5.0
+        },
+        "Nazli": {
+            "precision": 0.7142857142857143,
+            "recall": 1.0,
+            "f1-score": 0.8333333333333334,
+            "support": 5.0
+        },
+        "Pinot Noir": {
+            "precision": 0.6666666666666666,
+            "recall": 0.8,
+            "f1-score": 0.7272727272727273,
+            "support": 5.0
+        },
+        "Riesling": {
+            "precision": 0.5,
+            "recall": 0.2,
+            "f1-score": 0.2857142857142857,
+            "support": 5.0
+        },
+        "Sauvignon Blanc": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 5.0
+        },
+        "Syrah": {
+            "precision": 0.16666666666666666,
+            "recall": 0.2,
+            "f1-score": 0.18181818181818182,
+            "support": 5.0
+        },
+        "Tempranillo": {
+            "precision": 1.0,
+            "recall": 0.2,
+            "f1-score": 0.3333333333333333,
+            "support": 5.0
+        },
+        "accuracy": 0.6125,
+        "macro avg": {
+            "precision": 0.6097718253968254,
+            "recall": 0.6125,
+            "f1-score": 0.5721543162719633,
+            "support": 80.0
+        },
+        "weighted avg": {
+            "precision": 0.6097718253968253,
+            "recall": 0.6125,
+            "f1-score": 0.5721543162719633,
+            "support": 80.0
+        }
+    },
+    "timestamp": "20261015_160100"
+}

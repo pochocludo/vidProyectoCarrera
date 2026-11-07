@@ -10,16 +10,10 @@ SUPPORTED_ARCHITECTURES = [
     "resnet50"
 ]
 
-def build_model(architecture="mobilenet_v3_small", num_classes=16, input_shape=(224, 224, 3), dropout_rate=0.2):
+def build_model(architecture="mobilenet_v2", num_classes=16, input_shape=(256, 256, 3), dropout_rate=0.35):
     """
     Construye una red neuronal convolucional mediante transferencia de aprendizaje
     a partir de pesos preentrenados en ImageNet.
-    
-    Arquitecturas soportadas (según Sección 1.6.2 y 3.3.4 del proyecto de titulación):
-      - mobilenet_v3_small: Arquitectura ultra ligera (candidata principal para Raspberry Pi 5).
-      - mobilenet_v2: Arquitectura ligera de referencia móvil.
-      - efficientnet_b0: Modelo compacto con escalado compuesto.
-      - resnet50: Línea base de alta capacidad de cómputo para comparación.
     """
     arch = architecture.lower()
     if arch not in SUPPORTED_ARCHITECTURES:
@@ -28,7 +22,6 @@ def build_model(architecture="mobilenet_v3_small", num_classes=16, input_shape=(
     inputs = layers.Input(shape=input_shape, name="imagen_entrada")
 
     # Preprocesamiento específico por arquitectura integrado en el modelo
-    # Esto asegura que la conversión a TFLite e inferencia en Raspberry Pi sea idéntica (RF-02)
     if arch == "mobilenet_v3_small":
         x = keras.applications.mobilenet_v3.preprocess_input(inputs)
         base_model = keras.applications.MobileNetV3Small(
@@ -65,11 +58,12 @@ def build_model(architecture="mobilenet_v3_small", num_classes=16, input_shape=(
     # Congelar inicialmente la base convolucional para la Fase 1
     base_model.trainable = False
 
-    # Cabezal clasificador adaptado a clasificación varietal
+    # Cabezal clasificador robusto sin capas BN problemáticas
     features = base_model.output
     x = layers.GlobalAveragePooling2D(name="agrupamiento_promedio_global")(features)
-    if dropout_rate > 0:
-        x = layers.Dropout(dropout_rate, name="regularizacion_dropout")(x)
+    x = layers.Dropout(dropout_rate, name="dropout_1")(x)
+    x = layers.Dense(256, activation="relu", name="capa_densa_1")(x)
+    x = layers.Dropout(max(dropout_rate - 0.1, 0.15), name="dropout_2")(x)
     outputs = layers.Dense(num_classes, activation="softmax", dtype="float32", name="probabilidades_variedad")(x)
 
     model = keras.Model(inputs=inputs, outputs=outputs, name=f"vid_{arch}")
@@ -82,7 +76,7 @@ def compile_phase1(model, learning_rate=1e-3):
     optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(
         optimizer=optimizer,
-        loss="categorical_crossentropy",
+        loss=keras.losses.CategoricalCrossentropy(label_smoothing=0.05),
         metrics=[
             "accuracy",
             keras.metrics.TopKCategoricalAccuracy(k=3, name="top_3_accuracy")
@@ -90,28 +84,43 @@ def compile_phase1(model, learning_rate=1e-3):
     )
     return model
 
-def compile_phase2(model, base_model, fine_tune_layers=30, learning_rate=1e-5):
+def compile_phase2(model, base_model, fine_tune_layers=0, learning_rate=1e-4,
+                   steps_per_epoch=43, epochs=45):
     """
-    Compilación para Fase 2: Descongelamiento gradual de capas superiores y fine-tuning (Adam, lr=1e-5).
+    Compilación para Fase 2: Descongelamiento y fine-tuning.
+    Si fine_tune_layers <= 0, se descongela la base convolucional COMPLETA (end-to-end),
+    manteniendo únicamente las capas BatchNormalization congeladas en modo inferencia
+    para estabilizar estadísticas.
     """
     base_model.trainable = True
-    
-    # Congelar todas las capas excepto las últimas `fine_tune_layers`
     total_layers = len(base_model.layers)
-    cutoff = max(0, total_layers - fine_tune_layers)
+    
+    if fine_tune_layers <= 0 or fine_tune_layers >= total_layers:
+        cutoff = 0  # Descongelar TODAS las capas convolucionales
+    else:
+        cutoff = max(0, total_layers - fine_tune_layers)
+
     for layer in base_model.layers[:cutoff]:
         layer.trainable = False
     for layer in base_model.layers[cutoff:]:
-        # Mantener BatchNorm en modo inferencia para estabilizar estadísticas
+        # Mantener BatchNorm congelado para preservar estadísticas de ImageNet
         if isinstance(layer, layers.BatchNormalization):
             layer.trainable = False
         else:
             layer.trainable = True
 
-    optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
+    # Cosine Decay continuo
+    total_steps = steps_per_epoch * epochs
+    lr_schedule = keras.optimizers.schedules.CosineDecay(
+        initial_learning_rate=learning_rate,
+        decay_steps=total_steps,
+        alpha=0.01  # decae hasta el 1% del lr inicial (ej. 1e-6)
+    )
+
+    optimizer = keras.optimizers.Adam(learning_rate=lr_schedule)
     model.compile(
         optimizer=optimizer,
-        loss="categorical_crossentropy",
+        loss=keras.losses.CategoricalCrossentropy(label_smoothing=0.05),
         metrics=[
             "accuracy",
             keras.metrics.TopKCategoricalAccuracy(k=3, name="top_3_accuracy")
